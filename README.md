@@ -1,19 +1,35 @@
 # Chat Server
 
-Chat Server 是一个可直接运行的即时通讯项目，后端使用 FastAPI + SQLite，前端使用 React + Vite。项目重点实现 IM 系统的核心业务闭环：账号注册、好友申请审批、私聊群聊、消息回执、收藏、通知、审计、搜索和摘要。
+Chat Server 是一个可运行的即时通讯系统原型，包含后端 API、实时事件通道和 React 前端工作台。项目以“好友关系审批 + 私聊/群聊 + 消息可靠性”为核心，适合用于学习 IM 系统业务建模、课程设计、毕业设计或作品集展示。
 
-项目不会内置账号或人员资料。首次启动会创建空数据库，用户需要自行注册账号。
+系统默认从空数据库启动，不内置账号或人员资料。用户注册后才能使用好友申请、私聊、群聊、消息回执、通知、审计和搜索等能力。
 
-## 在线业务流程
+## 设计重点
 
-1. 用户注册账号并登录。
-2. 在“添加好友”弹窗中按账号搜索用户。
-3. 发送好友申请，等待对方同意。
-4. 对方在“好友申请”区域点击同意或拒绝。
-5. 只有成为好友后才能打开私聊。
-6. 好友可以被加入群聊。
-7. 消息发送后会生成送达/已读回执、通知和审计记录。
-8. 会话和消息可以搜索，消息可以收藏，聊天内容可以生成摘要。
+- **好友关系不是直接建立**：添加好友会先生成申请，对方同意后才会建立好友关系。
+- **会话权限受好友关系约束**：私聊只能在双方是好友后创建，群聊成员也必须来自好友列表。
+- **消息链路可追踪**：发送消息会记录幂等 `clientId`、送达/已读回执、通知和审计日志。
+- **搜索边界清晰**：全局搜索只覆盖会话和消息；找人只在添加好友弹窗中按账号搜索。
+- **隐私默认收敛**：项目不预置人员档案，前端只展示账号级信息。
+- **可以独立验证**：仓库提供 `scripts/smoke_test.py`，用临时数据库验证核心后端流程。
+
+## 核心场景
+
+### 好友申请
+
+用户通过账号搜索发起好友申请。申请不会自动通过，接收方需要在好友申请列表中选择同意或拒绝。同意后，双方好友列表才会出现对方。
+
+### 私聊和群聊
+
+私聊依赖已通过的好友关系。群聊由当前用户创建，成员只能从好友列表中选择；群聊创建后可以继续添加好友成员。会话支持置顶、静音、归档、删除、离开和解散。
+
+### 消息和回执
+
+消息发送支持 `clientId` 幂等处理，避免弱网重试导致重复消息。每条消息会生成送达/已读回执，前端展示回执统计；用户可以编辑、撤回和收藏消息。
+
+### 通知、审计和摘要
+
+系统会记录好友、会话、消息、通知等关键事件。通知中心支持全部已读；审计日志用于查看操作记录；摘要功能会基于最近聊天内容生成关键词和待办。
 
 ## 功能清单
 
@@ -31,7 +47,7 @@ Chat Server 是一个可直接运行的即时通讯项目，后端使用 FastAPI
 - 同意好友申请
 - 拒绝好友申请
 - 好友列表
-- 只有好友可以建立私聊或被加入群聊
+- 好友权限校验
 
 会话：
 
@@ -47,7 +63,7 @@ Chat Server 是一个可直接运行的即时通讯项目，后端使用 FastAPI
 消息：
 
 - 文本消息发送
-- `clientId` 幂等发送，避免重试导致重复消息
+- `clientId` 幂等发送
 - 消息编辑
 - 消息撤回
 - 送达/已读回执
@@ -168,9 +184,15 @@ npm install
 npm run build
 ```
 
-烟测会使用临时 SQLite 数据库，不会污染本地正式数据库。
+烟测会使用临时 SQLite 数据库，不会污染本地正式数据库。烟测覆盖空库初始化、注册、好友申请、同意、私聊、发消息、收藏、搜索和摘要。
 
 ## API 概览
+
+所有需要登录的接口都使用 Bearer token：
+
+```http
+Authorization: Bearer <token>
+```
 
 认证：
 
@@ -183,12 +205,12 @@ npm run build
 
 好友：
 
-- `GET /api/users`
-- `GET /api/users/search?q=账号`
-- `POST /api/friends`
-- `GET /api/friend-requests`
-- `POST /api/friend-requests/accept`
-- `POST /api/friend-requests/reject`
+- `GET /api/users`：获取当前账号的好友列表。
+- `GET /api/users/search?q=<username>`：按账号关键字搜索用户，用于发送好友申请。
+- `POST /api/friends`：创建好友申请，参数可以是 `targetUserId` 或 `username`。
+- `GET /api/friend-requests`：获取当前账号相关的待处理申请。
+- `POST /api/friend-requests/accept`：同意好友申请。
+- `POST /api/friend-requests/reject`：拒绝好友申请。
 
 会话：
 
@@ -203,7 +225,7 @@ npm run build
 
 消息：
 
-- `GET /api/messages`
+- `GET /api/messages?conversationId=<id>`
 - `POST /api/messages`
 - `PATCH /api/messages`
 - `DELETE /api/messages`
@@ -216,7 +238,7 @@ npm run build
 - `GET /api/notifications`
 - `POST /api/notifications/read`
 - `GET /api/audit`
-- `GET /api/search`
+- `GET /api/search?q=<keyword>`：搜索当前账号可访问的会话和消息，不返回用户结果。
 - `POST /api/summary`
 - `GET /api/stream`
 - `GET /api/health`
