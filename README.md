@@ -1,64 +1,94 @@
 # Chat Server
 
-Chat Server 是一个以 C++ 后端为主体的即时通讯系统原型，包含后端 API、React 前端工作台和核心链路烟测。项目以“好友关系审批 + 私聊/群聊 + 消息可靠性”为核心，适合用于学习 C++ 网络服务、业务建模和 IM 系统设计。
+Chat Server 是一个基于 C++17 后端和 React 前端的即时通讯系统原型。项目覆盖账号认证、好友审批、私聊、群聊、消息回执、收藏、通知、审计、搜索和会话摘要等核心 IM 场景，重点展示 C++ 网络服务、业务建模和前后端协作能力。
 
-系统默认从空数据文件启动，不内置账号或人员资料。用户注册后才能使用好友申请、私聊、群聊、消息回执、通知、审计和搜索等能力。
+后端不依赖 Web 框架，使用 POSIX Socket 实现 HTTP 服务，并通过轻量 JSON 组件完成请求解析、响应序列化和文件持久化。整体实现适合用于 C++ 后端学习、课程设计、毕业设计或作品集展示。
 
-## 当前后端
+## 功能特性
 
-当前主后端在 `cpp_server/`，使用 C++17 实现：
+- 账号注册、登录、退出和 Bearer Token 认证
+- 在线状态维护和会话级权限控制
+- 好友申请、同意、拒绝和好友关系校验
+- 好友通过后才允许创建私聊
+- 群聊创建、成员添加、离开和解散
+- 消息发送、编辑、撤回、收藏和 `clientId` 幂等处理
+- 消息送达/已读回执与未读数量统计
+- 通知中心、审计日志和运行指标
+- 会话与消息搜索
+- 基于最近消息的简易会话摘要、关键词和待办提取
+- React 工作台界面，支持开发模式代理和生产构建静态托管
 
-- POSIX socket HTTP 服务
-- 手写轻量 JSON 解析和序列化
-- 文件型 JSON 状态存储，默认 `data/chat_state.json`
-- Bearer token 登录态
-- 好友、会话、消息、回执、通知、审计和摘要业务逻辑
-- React 前端静态文件托管
+## 系统架构
 
-旧的 Python/FastAPI 后端入口已移除，当前仓库的后端实现以 `cpp_server/` 为准。
+```text
+Browser
+  |
+  | HTTP / JSON
+  v
+C++17 Backend
+  |-- POSIX Socket HTTP Server
+  |-- API Routing
+  |-- Token Authentication
+  |-- IM Domain Services
+  |-- JSON Parser / Serializer
+  |-- File Persistence: data/chat_state.json
+  |
+  v
+React Frontend
+```
+
+C++ 服务可以直接托管 `frontend/dist` 中的前端构建产物，因此生产测试时只需要启动一个后端进程即可同时提供页面和 API。
 
 ## 技术栈
 
 后端：
 
 - C++17
-- POSIX socket
+- POSIX Socket
+- Standard Library
+- JSON 文件持久化
 - GNU Make / CMake
-- JSON 文件存储
-- Server-Sent Events 兼容端点
 
 前端：
 
 - React
 - Vite
 - lucide-react
-- CSS Grid/Flex
+- CSS Grid / Flexbox
 
-## 项目结构
+测试与构建：
+
+- Node.js API 烟测脚本
+- Makefile 构建入口
+- 可选 CMake 构建入口
+
+## 目录结构
 
 ```text
 cpp_server/
-  include/json.hpp    轻量 JSON 类型、解析和序列化
-  include/http.hpp    HTTP 请求/响应与服务封装
-  include/app.hpp     IM 业务应用接口
-  src/http.cpp        POSIX socket HTTP 服务实现
-  src/app.cpp         认证、好友、会话、消息等业务逻辑
-  src/main.cpp        C++ 后端启动入口
+  include/
+    app.hpp           应用接口与领域模型声明
+    http.hpp          HTTP 请求、响应和服务封装
+    json.hpp          轻量 JSON 类型、解析器和序列化器
+  src/
+    app.cpp           认证、好友、会话、消息、通知和审计逻辑
+    http.cpp          POSIX Socket HTTP 服务实现
+    main.cpp          服务启动入口
 
 frontend/
-  src/main.jsx        React 应用入口和页面组件
+  src/main.jsx        React 应用入口
   src/styles.css      页面样式
   package.json        前端依赖和脚本
-  vite.config.js      Vite 开发代理到 8000
+  vite.config.js      开发代理配置
 
 scripts/
-  smoke_test_cpp.mjs  C++ 后端核心链路烟测
+  smoke_test_cpp.mjs  后端核心链路烟测
 
-Makefile              无 CMake 环境也能直接构建
-CMakeLists.txt        标准 CMake 构建配置
+Makefile              g++ 构建入口
+CMakeLists.txt        CMake 构建配置
 ```
 
-## 本地运行
+## 构建与运行
 
 构建 C++ 后端：
 
@@ -72,39 +102,114 @@ make
 make run
 ```
 
-默认监听：
+默认访问地址：
 
 ```text
 http://127.0.0.1:8000
 ```
 
-可用环境变量：
+常用运行参数：
 
 ```bash
-HOST=0.0.0.0 PORT=8000 DATA_FILE=data/chat_state.json DIST_DIR=frontend/dist ./build/cpp/chat_server
+HOST=0.0.0.0 \
+PORT=8000 \
+DATA_FILE=data/chat_state.json \
+DIST_DIR=frontend/dist \
+./build/cpp/chat_server
 ```
 
-前端开发：
+## 前端开发模式
+
+安装依赖：
 
 ```bash
 cd frontend
 npm install
+```
+
+启动 Vite：
+
+```bash
 npm run dev -- --host 0.0.0.0 --port 5173
 ```
 
-生产构建并由 C++ 后端托管：
+开发模式下，Vite 会将 `/api` 请求代理到：
+
+```text
+http://127.0.0.1:8000
+```
+
+因此开发模式需要同时运行：
+
+- C++ 后端：`8000`
+- Vite 前端：`5173`
+
+## 生产测试模式
+
+构建前端并由 C++ 后端统一托管：
 
 ```bash
 cd frontend
 npm install
 npm run build
+
 cd ..
-make run
+make
+HOST=0.0.0.0 PORT=8000 DIST_DIR=frontend/dist ./build/cpp/chat_server
+```
+
+然后访问：
+
+```text
+http://127.0.0.1:8000
+```
+
+## 远端服务器端口转发
+
+如果项目运行在远端服务器上，推荐转发 `8000` 端口。此模式下 C++ 服务同时提供前端页面和 API，最接近生产部署。
+
+远端服务器执行：
+
+```bash
+cd /root/renwu
+cd frontend && npm install && npm run build
+cd ..
+make
+HOST=0.0.0.0 PORT=8000 DIST_DIR=frontend/dist ./build/cpp/chat_server
+```
+
+本地通过 SSH 转发：
+
+```bash
+ssh -L 8000:127.0.0.1:8000 <user>@<server>
+```
+
+然后在本地浏览器打开：
+
+```text
+http://127.0.0.1:8000
+```
+
+如果使用 VS Code、Cursor 或云平台自带的 Port Forward 功能，直接转发远端 `8000` 端口即可。
+
+健康检查：
+
+```bash
+curl http://127.0.0.1:8000/api/health
+```
+
+正常响应会包含：
+
+```json
+{
+  "status": "ok",
+  "service": "ai-native-im-cpp"
+}
 ```
 
 ## CMake 构建
 
-本机如果安装了 CMake，也可以使用标准 out-of-source 构建：
+如果环境中安装了 CMake：
 
 ```bash
 cmake -S . -B build/cmake -DCMAKE_BUILD_TYPE=Release
@@ -112,21 +217,26 @@ cmake --build build/cmake
 ./build/cmake/chat_server
 ```
 
-当前环境没有安装 CMake，所以仓库同时提供了 `Makefile`。
+## 烟测
 
-## 验证
-
-启动 C++ 后端后运行烟测：
+后端启动后运行：
 
 ```bash
 BASE_URL=http://127.0.0.1:8000 node scripts/smoke_test_cpp.mjs
 ```
 
-烟测覆盖注册、好友申请、同意、私聊、发消息、收藏、搜索、摘要和健康检查。
+烟测覆盖注册、好友申请、同意好友、创建私聊、发送消息、收藏消息、搜索、摘要和健康检查。
+
+如需避免污染默认数据文件，可以使用临时数据文件启动服务：
+
+```bash
+DATA_FILE=/tmp/chat_server_smoke.json PORT=18080 ./build/cpp/chat_server
+BASE_URL=http://127.0.0.1:18080 node scripts/smoke_test_cpp.mjs
+```
 
 ## API 概览
 
-所有需要登录的接口都使用 Bearer token：
+需要登录的接口使用 Bearer Token：
 
 ```http
 Authorization: Bearer <token>
@@ -181,10 +291,12 @@ Authorization: Bearer <token>
 - `GET /api/stream`
 - `GET /api/health`
 
-## 数据和隐私
+## 数据存储
 
-- 项目不预置账号、姓名、部门、职位、手机号等人员资料。
-- 用户搜索只用于添加好友，并且前端只展示账号级信息。
-- 全局搜索只搜索会话和消息，不搜索人员。
-- 本地运行数据默认写入 `data/chat_state.json`。
-- `data/`、日志、PID、虚拟环境、`node_modules`、`dist` 和截图输出均已加入 `.gitignore`。
+默认运行数据文件：
+
+```text
+data/chat_state.json
+```
+
+本地运行数据、日志、构建产物、前端依赖和前端构建输出均已通过 `.gitignore` 排除。
