@@ -945,6 +945,17 @@ input:focus {
   overflow-wrap: anywhere;
 }
 
+.message-state {
+  margin: 8px 0 0;
+  color: var(--soft);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.message-state.failed {
+  color: var(--danger);
+}
+
 .message-actions {
   display: flex;
   flex-wrap: wrap;

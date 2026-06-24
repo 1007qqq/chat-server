@@ -65,6 +65,31 @@ function requestPeer(request) {
   return request.direction === "incoming" ? request.requester : request.recipient;
 }
 
+function optimisticMessage({ conversationId, content, clientId, user }) {
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, "0");
+  const createdAt = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  return {
+    id: `pending-${clientId}`,
+    conversationId,
+    senderId: user.id,
+    senderName: user.username,
+    senderUsername: user.username,
+    senderColor: user.avatarColor,
+    content,
+    kind: "text",
+    clientId,
+    status: "sending",
+    editedAt: null,
+    deletedAt: null,
+    replyToId: null,
+    createdAt,
+    receipts: { read: 1 },
+    saved: false,
+    pending: true
+  };
+}
+
 function App() {
   const [state, setState] = useState(initialState);
   const [authMode, setAuthMode] = useState("login");
@@ -312,14 +337,63 @@ function App() {
   async function sendMessage(event) {
     event.preventDefault();
     if (!activeConversation || !messageText.trim()) return;
+    const content = messageText.trim();
+    const clientId = `web-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const body = {
       conversationId: activeConversation.id,
-      content: messageText.trim(),
-      clientId: `web-${Date.now()}-${Math.random().toString(16).slice(2)}`
+      content,
+      clientId
     };
+    const pendingMessage = optimisticMessage({ conversationId: activeConversation.id, content, clientId, user: state.user });
     setMessageText("");
-    await api("/api/messages", { method: "POST", body: JSON.stringify(body) });
-    await loadMessages(activeConversation.id);
+    setState((prev) => ({
+      ...prev,
+      messages: [...prev.messages.filter((item) => item.clientId !== clientId), pendingMessage],
+      conversations: prev.conversations.map((item) => (
+        item.id === activeConversation.id
+          ? {
+              ...item,
+              lastMessage: {
+                id: pendingMessage.id,
+                senderName: state.user.username,
+                content,
+                createdAt: pendingMessage.createdAt,
+                status: "sending"
+              }
+            }
+          : item
+      ))
+    }));
+    try {
+      const data = await api("/api/messages", { method: "POST", body: JSON.stringify(body) });
+      setState((prev) => ({
+        ...prev,
+        messages: prev.messages.map((item) => (item.clientId === clientId ? data.message : item)),
+        conversations: prev.conversations.map((item) => (
+          item.id === activeConversation.id
+            ? {
+                ...item,
+                updatedAt: data.message.createdAt,
+                lastMessage: {
+                  id: data.message.id,
+                  senderName: data.message.senderUsername,
+                  content: data.message.content,
+                  createdAt: data.message.createdAt,
+                  status: data.message.status
+                }
+              }
+            : item
+        ))
+      }));
+      loadConversations({ includeArchived: showArchived }).catch(() => {});
+    } catch (error) {
+      setState((prev) => ({
+        ...prev,
+        messages: prev.messages.map((item) => (
+          item.clientId === clientId ? { ...item, status: "failed", pending: false, error: error.message } : item
+        ))
+      }));
+    }
   }
 
   async function updatePreference(patch) {
@@ -840,11 +914,13 @@ function MessageList({ conversation, user, messages, toggleSave, editMessage, de
               )}
               {message.status !== "deleted" && (
                 <div className="message-actions">
-                  <button type="button" onClick={() => toggleSave(message)}>{message.saved ? <BookmarkCheck size={15} /> : <Bookmark size={15} />} {message.saved ? "已收藏" : "收藏"}</button>
-                  {own && <button type="button" onClick={() => { setEditText(message.content); setEditingMessage(message.id); }}><Edit3 size={15} /> 编辑</button>}
-                  {own && <button type="button" onClick={() => deleteMessage(message)}><Trash2 size={15} /> 撤回</button>}
+                  {!message.pending && message.status !== "failed" && <button type="button" onClick={() => toggleSave(message)}>{message.saved ? <BookmarkCheck size={15} /> : <Bookmark size={15} />} {message.saved ? "已收藏" : "收藏"}</button>}
+                  {own && !message.pending && message.status !== "failed" && <button type="button" onClick={() => { setEditText(message.content); setEditingMessage(message.id); }}><Edit3 size={15} /> 编辑</button>}
+                  {own && !message.pending && message.status !== "failed" && <button type="button" onClick={() => deleteMessage(message)}><Trash2 size={15} /> 撤回</button>}
                 </div>
               )}
+              {message.status === "sending" && <p className="message-state">发送中</p>}
+              {message.status === "failed" && <p className="message-state failed">发送失败，请重试</p>}
             </div>
           </article>
         );
