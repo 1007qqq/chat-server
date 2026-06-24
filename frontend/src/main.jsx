@@ -2,14 +2,18 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Archive,
+  ArrowRight,
   Bell,
   Bookmark,
   BookmarkCheck,
   CheckCheck,
   Circle,
   Edit3,
+  FileText,
   Hash,
+  Info,
   Inbox,
+  Lock,
   LogOut,
   MessageSquare,
   PanelRight,
@@ -20,8 +24,10 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  Star,
   Trash2,
   UserPlus,
+  UserRound,
   Users,
   Volume2,
   VolumeX,
@@ -483,7 +489,7 @@ function App() {
         toggleArchivedView={toggleArchivedView}
         openModal={openModal}
       />
-      <main className="conversation-stage">
+      <main className={cn("conversation-stage", !activeConversation && "no-conversation")}>
         <ChatHeader
           currentUser={state.user}
           conversation={activeConversation}
@@ -565,12 +571,21 @@ function AuthScreen({ authMode, setAuthMode, authError, handleAuth }) {
           AI-Native IM
         </div>
         <h1>即时通讯工作台</h1>
-        <p>登录或创建账号后进入工作台。</p>
-        <div className="hero-metrics">
-          <span>C++17</span>
-          <span>React</span>
-          <span>JSON Store</span>
-          <span>SSE</span>
+        <p>连接团队、处理会话、管理消息和通知，让日常沟通保持清晰有序。</p>
+        <div className="auth-illustration" aria-hidden="true">
+          <div className="illustration-card card-a">
+            <span />
+            <strong />
+          </div>
+          <div className="illustration-card card-b">
+            <span />
+            <strong />
+          </div>
+          <div className="illustration-bubble">
+            <i />
+            <i />
+            <i />
+          </div>
         </div>
       </section>
       <form className="auth-card" onSubmit={handleAuth}>
@@ -579,14 +594,23 @@ function AuthScreen({ authMode, setAuthMode, authError, handleAuth }) {
           <button type="button" className={authMode === "register" ? "active" : ""} onClick={() => setAuthMode("register")}>注册</button>
         </div>
         <label>
-          账号
-          <input name="username" autoComplete="username" minLength={3} required />
+          <span className="field-label">账号</span>
+          <span className="input-shell">
+            <UserRound size={20} />
+            <input name="username" autoComplete="username" minLength={3} placeholder="请输入账号" required />
+          </span>
         </label>
         <label>
-          密码
-          <input name="password" type="password" autoComplete={authMode === "login" ? "current-password" : "new-password"} minLength={6} required />
+          <span className="field-label">密码</span>
+          <span className="input-shell">
+            <Lock size={20} />
+            <input name="password" type="password" autoComplete={authMode === "login" ? "current-password" : "new-password"} minLength={6} placeholder="请输入密码" required />
+          </span>
         </label>
-        <button className="primary-action">{authMode === "login" ? "进入工作台" : "创建账号"}</button>
+        <button className="primary-action auth-submit">
+          {authMode === "login" ? "进入工作台" : "创建账号"}
+          <ArrowRight size={19} />
+        </button>
         {authError && <p className="form-error">{authError}</p>}
       </form>
     </div>
@@ -595,18 +619,18 @@ function AuthScreen({ authMode, setAuthMode, authError, handleAuth }) {
 
 function WorkspaceRail({ user, logout, notifications, activePanel, setActivePanel }) {
   const nav = [
-    ["details", MessageSquare],
-    ["notifications", Bell],
-    ["saved", Bookmark],
-    ["audit", ShieldCheck],
-    ["settings", Settings]
+    ["details", MessageSquare, "详情"],
+    ["notifications", Bell, "通知"],
+    ["saved", Bookmark, "收藏"],
+    ["audit", ShieldCheck, "审计"],
+    ["settings", Settings, "设置"]
   ];
   return (
     <aside className="workspace-rail">
       <div className="rail-logo">AI</div>
       <nav>
-        {nav.map(([id, Icon]) => (
-          <button key={id} className={activePanel === id ? "active" : ""} onClick={() => setActivePanel(id)} title={id}>
+        {nav.map(([id, Icon, label]) => (
+          <button key={id} className={activePanel === id ? "active" : ""} onClick={() => setActivePanel(id)} title={label}>
             <Icon size={20} />
             {id === "notifications" && notifications.unread > 0 && <span className="badge-dot">{notifications.unread}</span>}
           </button>
@@ -775,7 +799,7 @@ function MessageList({ conversation, user, messages, toggleSave, editMessage, de
   if (!conversation) {
     return (
       <div className="message-list empty-state">
-        <MessageSquare size={42} />
+        <EmptyChatVisual />
         <h3>未选择会话</h3>
         <p>从左侧会话或好友发起聊天。</p>
       </div>
@@ -784,7 +808,7 @@ function MessageList({ conversation, user, messages, toggleSave, editMessage, de
   if (!messages.length) {
     return (
       <div className="message-list empty-state">
-        <Inbox size={42} />
+        <EmptyChatVisual />
         <h3>暂无消息</h3>
         <p>发送第一条消息。</p>
       </div>
@@ -831,17 +855,22 @@ function MessageList({ conversation, user, messages, toggleSave, editMessage, de
 
 function Inspector({ activePanel, setActivePanel, state, activeConversation, markNotificationsRead, openModal }) {
   const tabs = [
-    ["details", "详情"],
-    ["notifications", "通知"],
-    ["summary", "摘要"],
-    ["saved", "收藏"],
-    ["audit", "审计"],
-    ["settings", "设置"]
+    ["details", "详情", Info],
+    ["notifications", "通知", Bell],
+    ["summary", "摘要", FileText],
+    ["saved", "收藏", Star],
+    ["audit", "审计", ShieldCheck],
+    ["settings", "设置", Settings]
   ];
   return (
     <aside className="inspector">
       <div className="inspector-tabs">
-        {tabs.map(([id, label]) => <button type="button" key={id} className={activePanel === id ? "active" : ""} onClick={() => setActivePanel(id)}>{label}</button>)}
+        {tabs.map(([id, label, Icon]) => (
+          <button type="button" key={id} className={activePanel === id ? "active" : ""} onClick={() => setActivePanel(id)}>
+            <Icon size={18} />
+            {label}
+          </button>
+        ))}
       </div>
       {activePanel === "details" && (
         <DetailsPanel
@@ -861,6 +890,15 @@ function Inspector({ activePanel, setActivePanel, state, activeConversation, mar
 }
 
 function DetailsPanel({ conversation, currentUser, health, openModal }) {
+  const metricIcons = {
+    auditLogs: FileText,
+    conversations: MessageSquare,
+    friendships: Users,
+    messages: Bell,
+    notifications: Bell,
+    online: Circle,
+    users: UserRound
+  };
   return (
     <div className="panel-content">
       <h3>会话详情</h3>
@@ -885,9 +923,18 @@ function DetailsPanel({ conversation, currentUser, health, openModal }) {
       ) : <p className="muted">选择会话后查看成员。</p>}
       <h3>运行指标</h3>
       <div className="metric-grid">
-        {Object.entries(health?.metrics || {}).map(([key, value]) => (
-          <div key={key}><strong>{value}</strong><span>{key}</span></div>
-        ))}
+        {Object.entries(health?.metrics || {}).map(([key, value]) => {
+          const MetricIcon = metricIcons[key] || Info;
+          return (
+            <div key={key} className="metric-card">
+              <span className={cn("metric-icon", key === "online" && "success")}>
+                <MetricIcon size={21} fill={key === "online" ? "currentColor" : "none"} />
+              </span>
+              <strong>{value}</strong>
+              <small>{key}</small>
+            </div>
+          );
+        })}
       </div>
       <h3>当前账号</h3>
       <div className="account-card">
@@ -983,10 +1030,17 @@ function SettingsPanel({ user, settings }) {
 function AddFriendModal({ state, closeModal, runFriendSearch, requestFriend, startDirect, friendStatus }) {
   return (
     <Modal title="添加好友" closeModal={closeModal}>
-      <div className="search-box">
-        <Search size={16} />
-        <input value={state.friendSearch.q} onChange={(e) => runFriendSearch(e.target.value)} placeholder="输入账号搜索" autoFocus />
+      <div className="modal-search-row">
+        <div className="search-box modal-search">
+          <Search size={18} />
+          <input value={state.friendSearch.q} onChange={(e) => runFriendSearch(e.target.value)} placeholder="输入账号搜索" autoFocus />
+        </div>
+        <button type="button" className="primary-action modal-search-button" onClick={() => runFriendSearch(state.friendSearch.q)}>
+          搜索
+        </button>
       </div>
+      <p className="muted compact-copy">输入账号后搜索并发送好友申请。</p>
+      <div className="modal-list-heading"><strong>{state.friendSearch.q ? "搜索结果" : "好友搜索"}</strong></div>
       <div className="friend-results modal-list">
         {state.friendSearch.q && state.friendSearch.users.length ? state.friendSearch.users.map((user) => (
           <div key={user.id} className="friend-result-row">
@@ -1003,7 +1057,11 @@ function AddFriendModal({ state, closeModal, runFriendSearch, requestFriend, sta
             )}
           </div>
         )) : (
-          <p className="muted compact-copy">{state.friendSearch.q ? "没有找到账号。" : "输入账号后搜索。"}</p>
+          <div className="friend-empty-state">
+            <Search size={34} />
+            <strong>{state.friendSearch.q ? "没有找到账号" : "输入账号开始搜索"}</strong>
+            <p>{state.friendSearch.q ? "请确认账号是否正确。" : "搜索结果会显示在这里，可直接发送好友申请。"}</p>
+          </div>
         )}
       </div>
       {state.friendRequests.outgoing.length > 0 && (
@@ -1112,6 +1170,19 @@ function Modal({ title, closeModal, children }) {
 
 function Avatar({ user }) {
   return <span className="avatar" style={{ "--avatar": user?.avatarColor || "#002FA7" }}>{initials(user?.username || user?.displayName)}</span>;
+}
+
+function EmptyChatVisual() {
+  return (
+    <div className="empty-visual" aria-hidden="true">
+      <div className="empty-visual-base" />
+      <div className="empty-visual-bubble">
+        <span />
+        <span />
+        <span />
+      </div>
+    </div>
+  );
 }
 
 createRoot(document.getElementById("root")).render(<App />);
