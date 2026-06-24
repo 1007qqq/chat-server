@@ -12,6 +12,9 @@ data/
 *.db
 *.db-shm
 *.db-wal
+*.json.tmp
+
+build/
 
 *.log
 *.pid

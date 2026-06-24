@@ -567,9 +567,9 @@ function AuthScreen({ authMode, setAuthMode, authError, handleAuth }) {
         <h1>即时通讯工作台</h1>
         <p>登录或创建账号后进入工作台。</p>
         <div className="hero-metrics">
-          <span>FastAPI</span>
+          <span>C++17</span>
           <span>React</span>
-          <span>SQLite</span>
+          <span>JSON Store</span>
           <span>SSE</span>
         </div>
       </section>
